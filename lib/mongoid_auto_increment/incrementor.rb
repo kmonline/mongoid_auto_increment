@@ -10,12 +10,22 @@ module MongoidAutoIncrement
       end
 
        def inc
-        opts = {
-          "query"  => query,
-          "update" => {"$inc" => { "number" => 1 }},
-          "new"    => true # return the modified document
-        }
-        collection.find_and_modify(opts)["number"]
+        if ::Mongoid::VERSION < '3'
+          opts = {
+            "query"  => query,
+            "update" => {"$inc" => { "number" => 1 }},
+            "new"    => true # return the modified document
+          }
+          collection.find_and_modify(opts)["number"]
+        else
+          Mongoid.default_session.command(
+            findAndModify: @collection,
+            query: query,
+            update: {"$inc" => {number: 1}},
+            new: true,
+            upsert: true
+          )["value"]["number"]
+        end
        end
 
       def current
@@ -33,7 +43,11 @@ module MongoidAutoIncrement
       end
 
       def collection
-        Mongoid.database[@collection]
+        if ::Mongoid::VERSION < '3'
+          Mongoid.database[@collection]
+        else
+          Mongoid.default_session[@collection]
+        end
       end
 
       def query
